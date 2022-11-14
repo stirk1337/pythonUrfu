@@ -1,0 +1,78 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Report</title>
+    <style>
+    body {
+        text-align: center;
+        font-family: Verdana, sans-serif;
+    }
+    table, td, th{
+        border: 1px solid black;
+        border-collapse: collapse;
+        text-align: center;
+        padding: 5px;
+    }
+    table{
+        display: inline-block;
+        margin-left: 20px;
+    }
+    div{
+        display: flex;
+        align-items: flex-start;
+    }
+</style>
+</head>
+<body>
+    <h1>Аналитика по зарплатам и городам для профессии {{ prof }}</h1>
+    <img src="C:/Users/stirk/PycharmProjects/pythonURFU/graph.png" alt="">
+    <h2>Статистика по годам</h2>
+    <table>
+      <tr>
+        <th>Год</th>
+          <th>Средняя зарплата</th>
+        <th>Средняя зарплата - {{ prof }}</th>
+        <th>Количество вакансий</th>
+          <th>Количество вакансий - {{ prof }}</th>
+      </tr>
+        {% for item in items1 %}
+      <tr>
+        <td>{{item.first}}</td>
+        <td>{{item.second}}</td>
+        <td>{{item.third}}</td>
+        <td>{{item.four}}</td>
+        <td>{{item.five}}</td>
+      </tr>
+        {% endfor %}
+    </table>
+    <br>
+    <br>
+    <h2>Статистика по городам</h2>
+    <div>
+        <table>
+            <tr>
+                <th>Город</th>
+                <th>Уровень зарплат</th>
+            </tr>
+            {% for item in items2 %}
+            <tr>
+                <td>{{item.first}}</td>
+                <td>{{item.second}}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        <table>
+            <tr>
+                <th>Город</th>
+                <th>Доля вакансий</th>
+            </tr>
+            {% for item in items3 %}
+            <tr>
+                <td>{{item.first}}</td>
+                <td>{{item.second}}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
