@@ -268,6 +268,9 @@ inp = input('Введите название файла: ')
 prof = input('Введите название профессии: ')
 data = DataSet(inp, prof)
 data.calculations()
-data.show()
-rep = report(data)
-rep.generate_pdf("report.pdf")
+todo = input('Введите данные для печати: ')
+if todo == 'Вакансии':
+    data.show()
+elif todo == 'Статистика':
+    rep = report(data)
+    rep.generate_pdf("report.pdf")
