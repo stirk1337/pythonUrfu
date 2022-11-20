@@ -7,3 +7,5 @@ venv/
 graph.png
 report.xlsx
 report.pdf
+*.orig
+*.swp
