@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
-
+import decimal
 
 class DataSet:
     def __init__(self, name, prof):
