@@ -11,7 +11,29 @@ import pdfkit
 
 
 class DataSet:
+    """Выполняет вычисления для данного csv файла с вакансии с сайта HH"
+
+    Attributes:
+        CURRENCY_TO_RUB (dict): Словарь конвертации валют
+        name (str): Название файла
+        prof (str): Название профессии
+        vac (list): Список вакансий
+        dict_naming (dict): Словарь колонки - индексы
+        salary_dynamic (dict): Словарь зарплат по годам
+        count_dynamic (dict): Словарь количества вакансий по годам
+        salary_prof_dynamic (dict): Словарь уровня зарплат по годам для выбранной профессии prof
+        prof_count (dict): Словарь количества вакансий по годам для выбранной профессии prof
+        salary_city (dict): Словарь уровня зарплат по городам
+        most (dict): Словарь доли ваканий по городам
+        city_count (dict): Словарь количества городов
+    """
     def __init__(self, name, prof):
+        """Иницилиазирует объект DataSet, создаёт нужные словари для дальшейших вычислений
+
+        Args:
+            name (str): Название файла
+            prof (str): Название профессии
+        """
         self.CURRENCY_TO_RUB = {
             "AZN": 35.68,
             "BYR": 23.91,
@@ -41,23 +63,45 @@ class DataSet:
         self.years = {}
 
     def csv_reader(self):
+        """Считывает csv-файл name
+
+        Returns:
+            data (list): Считанные профессии
+            data[0] (list): Заголовки столбцов
+        """
         f = open(self.file_name, encoding='utf-8-sig')
         csv_list = csv.reader(f)
         data = [x for x in csv_list]
         return data, data[0]
 
     def csv_filer(self):
+        """Обрабатывает csv-файл name: удаляет из него html-теги, удаляет неправильные столбцы
+
+        Returns:
+            vac (list): Список очищенных вакансий
+        """
         all_vac = [x for x in self.vac[1:] if '' not in x and len(x) == len(self.vac[0])]
         vac = [[self.clean(y) for y in x] for x in all_vac]
         return vac
 
     @staticmethod
     def clean(text):
+        """Очищает строку от html-тегов и лишних пробелов
+
+        Args:
+            text (str): Строка, которую нужно отчистить от html-тегов и лишних пробелов
+
+        Returns:
+            str: Строка, очищенная от html-тегов и лишних пробелов
+        """
         example = re.compile(r'<[^>]+>')
         s = example.sub('', text).replace(' ', ' ').replace('\xa0', ' ').strip()
         return re.sub(" +", " ", s)
 
     def calculations(self):
+        """Выполняет все вычисления, подготавливает данные для графиков и таблиц (заполняет все ранее сгенерированные словари)
+
+        """
         for item in self.vac:
             year = int(item[self.dict_naming['published_at']].split('-')[0])
             if year not in self.years:
@@ -112,6 +156,9 @@ class DataSet:
         self.most = {k: v for k, v in self.most.items() if v >= 0.01}
 
     def show(self):
+        """Печатает на экран все словари с данными
+
+        """
         print('Динамика уровня зарплат по годам:', self.salary_dynamic)
         print('Динамика количества вакансий по годам:', self.count_dynamic)
         print('Динамика уровня зарплат по годам для выбранной профессии:', self.salary_prof_dynamic)
@@ -121,10 +168,30 @@ class DataSet:
 
 
 class report:
+    """Класс, генерирующий отчеты: excel-таблицы, графики, и pdf файл
+
+    Attributes:
+        data (DataSet): Все данные для визуализации
+    """
     def __init__(self, data):
+        """Инициализурует класс report
+
+        Args:
+            data (DataSet): Данные для визуализации
+        """
         self.data = data
 
     def generate_excel(self, filename):
+        """Генерирует excel-файл: 2 книги. Первая книга содержит статистику по годам, а вторая статистику по городам
+
+        Args:
+            filename (str): Название файла, который будет сгенерирован
+
+        Returns:
+            ws1 (Worksheet): Книга1 (статистика по годам)
+            ws2 (Worksheet): Книга2 (статистика по городам)
+
+        """
         workbook = openpyxl.Workbook()
         ws1 = workbook.active
         ws1.title = "Статистика по годам"
@@ -182,6 +249,12 @@ class report:
         return ws1, ws2
 
     def generate_image(self, filename):
+        """Генерирует график, основанный на data
+
+        Args:
+            filename (str): Название файла, который будет сгенерирован
+
+        """
         width = 0.4
         fontsize = 8
         fig, axs = plt.subplots(2, 2, figsize=(9, 6))
@@ -230,6 +303,13 @@ class report:
         fig.savefig(filename)
 
     def generate_pdf(self, filename):
+        """Генерирует pdf, основанный на графике и excel таблицах.
+        Вся информарция сначала парситься в html, а из html в pdf.
+
+        Args:
+            filename (str): Название файла, который будет сгенерирован
+
+        """
         config = pdfkit.configuration(wkhtmltopdf=r'D:\wkhtmltopdf\bin\wkhtmltopdf.exe')
         options = {
             "enable-local-file-access": None
