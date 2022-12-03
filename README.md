@@ -1,2 +1,2 @@
 # pythonUrfu
-![alt text](https://imgur.com/a/2DSPlJY)
+![alt text](https://i.imgur.com/GRIO9X4.png)
