@@ -27,6 +27,19 @@ class DataSet:
         most (dict): Словарь доли ваканий по городам
         city_count (dict): Словарь количества городов
     """
+    CURRENCY_TO_RUB = {
+        "AZN": 35.68,
+        "BYR": 23.91,
+        "EUR": 59.90,
+        "GEL": 21.74,
+        "KGS": 0.76,
+        "KZT": 0.13,
+        "RUR": 1,
+        "UAH": 1.64,
+        "USD": 60.66,
+        "UZS": 0.0055,
+    }
+
     def __init__(self, name, prof):
         """Иницилиазирует объект DataSet, создаёт нужные словари для дальшейших вычислений
 
@@ -34,33 +47,16 @@ class DataSet:
             name (str): Название файла
             prof (str): Название профессии
         """
-        self.CURRENCY_TO_RUB = {
-            "AZN": 35.68,
-            "BYR": 23.91,
-            "EUR": 59.90,
-            "GEL": 21.74,
-            "KGS": 0.76,
-            "KZT": 0.13,
-            "RUR": 1,
-            "UAH": 1.64,
-            "USD": 60.66,
-            "UZS": 0.0055,
-        }
         self.file_name = name
         self.prof = prof
         self.vac, self.header = self.csv_reader()
-        self.vac = self.csv_filer()
-        self.dict_naming = {}
-        for i in range(len(self.header)):
-            self.dict_naming[self.header[i]] = i
-        self.salary_dynamic = {}
-        self.count_dynamic = {}
-        self.salary_prof_dynamic = {}
-        self.city_count = {}
-        self.salary_city = {}
-        self.prof_count = {}
-        self.most = {}
-        self.years = {}
+        self.vac = self.csv_filer(self.vac)
+        self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
+            self.vac, self.header, self.prof)
+        self.salary_city = DataSet.calculate_city(self.vac, self.header, self.dict_naming, self.city_count)
+        self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
+            self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
+            self.prof_count)
 
     def csv_reader(self):
         """Считывает csv-файл name
@@ -74,14 +70,15 @@ class DataSet:
         data = [x for x in csv_list]
         return data, data[0]
 
-    def csv_filer(self):
+    @staticmethod
+    def csv_filer(vac):
         """Обрабатывает csv-файл name: удаляет из него html-теги, удаляет неправильные столбцы
 
         Returns:
             vac (list): Список очищенных вакансий
         """
-        all_vac = [x for x in self.vac[1:] if '' not in x and len(x) == len(self.vac[0])]
-        vac = [[self.clean(y) for y in x] for x in all_vac]
+        all_vac = [x for x in vac[1:] if '' not in x and len(x) == len(vac[0])]
+        vac = [[DataSet.clean(y) for y in x] for x in all_vac]
         return vac
 
     @staticmethod
@@ -92,68 +89,92 @@ class DataSet:
             text (str): Строка, которую нужно отчистить от html-тегов и лишних пробелов
 
         Returns:
-            str: Строка, очищенная от html-тегов и лишних пробелов
+            str: Строка, очищенная от html-т    егов и лишних пробелов
         """
         example = re.compile(r'<[^>]+>')
         s = example.sub('', text).replace(' ', ' ').replace('\xa0', ' ').strip()
         return re.sub(" +", " ", s)
 
-    def calculations(self):
-        """Выполняет все вычисления, подготавливает данные для графиков и таблиц (заполняет все ранее сгенерированные словари)
+    @staticmethod
+    def count(vac, header, prof):
+        """Выполняет счёт по вакансиям
 
         """
-        for item in self.vac:
-            year = int(item[self.dict_naming['published_at']].split('-')[0])
-            if year not in self.years:
-                self.years[year] = year
+        dict_naming = {}
+        for i in range(len(header)):
+            dict_naming[header[i]] = i
+        salary_dynamic = {}
+        count_dynamic = {}
+        salary_prof_dynamic = {}
+        city_count = {}
+        prof_count = {}
+        years = {}
+
+        for item in vac:
+            year = int(item[dict_naming['published_at']].split('-')[0])
+            if year not in years:
+                years[year] = year
             for i in range(len(item)):
-                if self.header[i] == 'salary_from':
+                if header[i] == 'salary_from':
                     salary = (float(item[i]) + float(item[i + 1])) / 2
-                    if item[self.dict_naming['salary_currency']] != 'RUR':
-                        salary *= self.CURRENCY_TO_RUB[item[self.dict_naming['salary_currency']]]
-                    if year not in self.salary_dynamic:
-                        self.salary_dynamic[year] = []
-                    self.salary_dynamic[year].append(int(salary))
-                    if year not in self.salary_prof_dynamic:
-                        self.salary_prof_dynamic[year] = []
-                    if prof in item[0]: self.salary_prof_dynamic[year].append(int(salary))
-                    if year not in self.prof_count:
-                        self.prof_count[year] = 0
-                    if prof in item[0]: self.prof_count[year] += 1
-                city = item[self.dict_naming['area_name']]
-                if city not in self.city_count:
-                    self.city_count[city] = 0
-                self.city_count[city] += 1
-            if year not in self.count_dynamic:
-                self.count_dynamic[year] = 0
-            self.count_dynamic[year] += 1
+                    if item[dict_naming['salary_currency']] != 'RUR':
+                        salary *= DataSet.CURRENCY_TO_RUB[item[dict_naming['salary_currency']]]
+                    if year not in salary_dynamic:
+                        salary_dynamic[year] = []
+                    salary_dynamic[year].append(int(salary))
+                    if year not in salary_prof_dynamic:
+                        salary_prof_dynamic[year] = []
+                    if prof in item[0]: salary_prof_dynamic[year].append(int(salary))
+                    if year not in prof_count:
+                        prof_count[year] = 0
+                    if prof in item[0]: prof_count[year] += 1
+                city = item[dict_naming['area_name']]
+                if city not in city_count:
+                    city_count[city] = 0
+                city_count[city] += 1
+            if year not in count_dynamic:
+                count_dynamic[year] = 0
+            count_dynamic[year] += 1
+        return dict_naming, salary_dynamic, count_dynamic, salary_prof_dynamic, city_count, prof_count, years
 
-        for item in self.vac:
+    @staticmethod
+    def calculate_city(vac, header, dict_naming, city_count):
+        """Выполняет счет по городам
+
+        """
+        salary_city = {}
+        for item in vac:
             for i in range(len(item)):
-                if self.header[i] == 'salary_from':
+                if header[i] == 'salary_from':
                     salary = (float(item[i]) + float(item[i + 1])) / 2
-                    city = item[self.dict_naming['area_name']]
-                    if item[self.dict_naming['salary_currency']] != 'RUR':
-                        salary *= self.CURRENCY_TO_RUB[item[self.dict_naming['salary_currency']]]
-                    if self.city_count[city] >= int(sum(self.city_count.values()) * 0.01):
-                        if city not in self.salary_city:
-                            self.salary_city[city] = []
-                        self.salary_city[city].append(int(salary))
+                    city = item[dict_naming['area_name']]
+                    if item[dict_naming['salary_currency']] != 'RUR':
+                        salary *= DataSet.CURRENCY_TO_RUB[item[dict_naming['salary_currency']]]
+                    if city_count[city] >= int(sum(city_count.values()) * 0.01):
+                        if city not in salary_city:
+                            salary_city[city] = []
+                        salary_city[city].append(int(salary))
+        return salary_city
 
-        for key in self.salary_dynamic:
-            self.salary_dynamic[key] = sum(self.salary_dynamic[key]) // len(self.salary_dynamic[key])
+    @staticmethod
+    def last_summ(salary_dynamic, salary_prof_dynamic, salary_city, city_count, count_dynamic, prof_count):
+        """ Решающая сумма всех словарей
+            """
+        for key in salary_dynamic:
+            salary_dynamic[key] = sum(salary_dynamic[key]) // len(salary_dynamic[key])
 
-        for key in self.salary_prof_dynamic:
-            self.salary_prof_dynamic[key] = sum(self.salary_prof_dynamic[key]) // max(len(
-                self.salary_prof_dynamic[key]), 1)
+        for key in salary_prof_dynamic:
+            salary_prof_dynamic[key] = sum(salary_prof_dynamic[key]) // max(len(
+                salary_prof_dynamic[key]), 1)
 
-        for key in self.salary_city:
-            self.salary_city[key] = sum(self.salary_city[key]) // len(self.salary_city[key])
+        for key in salary_city:
+            salary_city[key] = sum(salary_city[key]) // len(salary_city[key])
 
-        self.salary_city = dict(Counter(self.salary_city).most_common(10))
-        self.most = {k: float('{:.4f}'.format(v / sum(self.city_count.values()))) for k, v in self.city_count.items()}
-        self.most = dict(Counter(self.most).most_common(10))
-        self.most = {k: v for k, v in self.most.items() if v >= 0.01}
+        salary_city = dict(Counter(salary_city).most_common(10))
+        most = {k: float('{:.4f}'.format(v / sum(city_count.values()))) for k, v in city_count.items()}
+        most = dict(Counter(most).most_common(10))
+        most = {k: v for k, v in most.items() if v >= 0.01}
+        return salary_dynamic, count_dynamic, salary_prof_dynamic, prof_count, salary_city, most
 
     def show(self):
         """Печатает на экран все словари с данными
@@ -173,6 +194,7 @@ class report:
     Attributes:
         data (DataSet): Все данные для визуализации
     """
+
     def __init__(self, data):
         """Инициализурует класс report
 
@@ -344,13 +366,18 @@ class report:
         pdfkit.from_string(pdf_template, filename, configuration=config, options=options)
 
 
-inp = input('Введите название файла: ')
-prof = input('Введите название профессии: ')
-data = DataSet(inp, prof)
-data.calculations()
-todo = input('Введите данные для печати: ')
-if todo == 'Вакансии':
-    data.show()
-elif todo == 'Статистика':
-    rep = report(data)
-    rep.generate_pdf("report.pdf")
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
+
+    inp = input('Введите название файла: ')
+    prof = input('Введите название профессии: ')
+    data = DataSet(inp, prof)
+    todo = input('Введите данные для печати: ')
+    if todo == 'Вакансии':
+        data.show()
+    elif todo == 'Статистика':
+        rep = report(data)
+        rep.generate_pdf("report.pdf")
+
+
