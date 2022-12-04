@@ -190,6 +190,12 @@ class DataSet:
 
     @staticmethod
     def make_chunks(vac, header):
+        """Делит csv файл на чанки
+
+        Args:
+            vac (str): Список профессий
+            header (str): Шапка всех файлов
+        """
         was = []
         dict_naming = {}
         for i in range(len(header)):
