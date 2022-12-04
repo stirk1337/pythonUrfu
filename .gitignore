@@ -9,3 +9,6 @@ report.xlsx
 report.pdf
 *.orig
 *.swp
+files/
+vbig.csv
+year.csv

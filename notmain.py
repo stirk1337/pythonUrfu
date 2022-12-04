@@ -50,6 +50,7 @@ class DataSet:
         self.file_name = name
         self.prof = prof
         self.vac, self.header = self.csv_reader()
+        DataSet.make_chunks(self.vac, self.header)
         self.vac = self.csv_filer(self.vac)
         self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
             self.vac, self.header, self.prof)
@@ -186,6 +187,23 @@ class DataSet:
         print('Динамика количества вакансий по годам для выбранной профессии:', self.prof_count)
         print('Уровень зарплат по городам (в порядке убывания):', self.salary_city)
         print('Доля вакансий по городам (в порядке убывания):', self.most)
+
+    @staticmethod
+    def make_chunks(vac, header):
+        was = []
+        dict_naming = {}
+        for i in range(len(header)):
+            dict_naming[header[i]] = i
+        for item in vac:
+            if item == header:
+                continue
+            year = item[dict_naming['published_at']].split('-')[0]
+            with open(f'files/{year}.csv', 'a', encoding='utf-8-sig', newline='') as file:
+                writer = csv.writer(file)
+                if year not in was:
+                    writer.writerow(header)
+                    was.append(year)
+                writer.writerow(item)
 
 
 class report:
@@ -367,8 +385,6 @@ class report:
 
 
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
 
     inp = input('Введите название файла: ')
     prof = input('Введите название профессии: ')
@@ -379,5 +395,7 @@ if __name__ == '__main__':
     elif todo == 'Статистика':
         rep = report(data)
         rep.generate_pdf("report.pdf")
+
+
 
 
