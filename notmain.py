@@ -8,7 +8,8 @@ from matplotlib import pyplot as plt
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
-
+from multiprocessing import Process, Queue
+from datetime import datetime
 
 class DataSet:
     """Выполняет вычисления для данного csv файла с вакансии с сайта HH"
@@ -49,8 +50,9 @@ class DataSet:
         """
         self.file_name = name
         self.prof = prof
+
+    def start(self):
         self.vac, self.header = self.csv_reader()
-        DataSet.make_chunks(self.vac, self.header)
         self.vac = self.csv_filer(self.vac)
         self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
             self.vac, self.header, self.prof)
@@ -58,6 +60,22 @@ class DataSet:
         self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
             self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
             self.prof_count)
+        self.show()
+
+    def start_multi(self, q_salary_dynamic, q_count_dynamic, q_salary_prof_dynamic, q_prof_count):
+        self.vac, self.header = self.csv_reader()
+        self.vac = self.csv_filer(self.vac)
+        self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
+            self.vac, self.header, self.prof)
+        self.salary_city = DataSet.calculate_city(self.vac, self.header, self.dict_naming, self.city_count)
+        self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
+            self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
+            self.prof_count)
+        q_salary_dynamic.put(self.salary_dynamic)
+        q_count_dynamic.put(self.count_dynamic)
+        q_salary_prof_dynamic.put(self.salary_prof_dynamic)
+        q_prof_count.put(self.prof_count)
+
 
     def csv_reader(self):
         """Считывает csv-файл name
@@ -391,17 +409,36 @@ class report:
 
 
 if __name__ == '__main__':
+    choice = input("Введите как будет работать программа? (multiproccess, single): ")
+    start_time = datetime.now()
+    if choice == "multiproccess":
+        processes = []
+        q_salary_dynamic = Queue()
+        q_count_dynamic = Queue()
+        q_salary_prof_dynamic = Queue()
+        q_prof_count = Queue()
+        for w in range(2007, 2022 + 1):
+            d = DataSet(f"files/{w}.csv", "Аналитик")
+            p = Process(target=d.start_multi, args=(q_salary_dynamic, q_count_dynamic, q_salary_prof_dynamic, q_prof_count))
+            processes.append(p)
+            p.start()
 
-    inp = input('Введите название файла: ')
-    prof = input('Введите название профессии: ')
-    data = DataSet(inp, prof)
-    todo = input('Введите данные для печати: ')
-    if todo == 'Вакансии':
-        data.show()
-    elif todo == 'Статистика':
-        rep = report(data)
-        rep.generate_pdf("report.pdf")
+        for p in processes:
+            p.join()
 
+        def iterate(q):
+            list = [q.get() for _ in processes]
+            d = {}
+            for i in list:
+                d = d | i
+            return d
+        print(f"Динамика уровня зарплат по годам: {dict(sorted(iterate(q_salary_dynamic).items(), key = lambda x:x[0]))}")
+        print(f"Динамика количества вакансий по годам: {dict(sorted(iterate(q_count_dynamic).items(), key = lambda x:x[0]))}")
+        print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(iterate(q_salary_prof_dynamic).items(), key = lambda x:x[0]))}")
+        print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(iterate(q_prof_count).items(), key = lambda x:x[0]))}")
 
+    elif choice == "single":
+        d = DataSet(f"year.csv", "Аналитик")
+        d.start()
 
-
+    print(f"Время: {datetime.now() - start_time}")
