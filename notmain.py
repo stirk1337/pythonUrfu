@@ -8,8 +8,12 @@ from matplotlib import pyplot as plt
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
-from multiprocessing import Process, Queue
+from multiprocessing import Process
+from multiprocessing import Queue as QueueP
+from queue import Queue
 from datetime import datetime
+import concurrent.futures
+
 
 class DataSet:
     """Выполняет вычисления для данного csv файла с вакансии с сайта HH"
@@ -60,22 +64,17 @@ class DataSet:
         self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
             self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
             self.prof_count)
-        self.show()
 
     def start_multi(self, q_salary_dynamic, q_count_dynamic, q_salary_prof_dynamic, q_prof_count):
-        self.vac, self.header = self.csv_reader()
-        self.vac = self.csv_filer(self.vac)
-        self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
-            self.vac, self.header, self.prof)
-        self.salary_city = DataSet.calculate_city(self.vac, self.header, self.dict_naming, self.city_count)
-        self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
-            self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
-            self.prof_count)
+        self.start()
         q_salary_dynamic.put(self.salary_dynamic)
         q_count_dynamic.put(self.count_dynamic)
         q_salary_prof_dynamic.put(self.salary_prof_dynamic)
         q_prof_count.put(self.prof_count)
 
+    def start_futures(self):
+        self.start()
+        return self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count
 
     def csv_reader(self):
         """Считывает csv-файл name
@@ -409,22 +408,19 @@ class report:
 
 
 if __name__ == '__main__':
-    choice = input("Введите как будет работать программа? (multiproccess, single): ")
+    choice = input("Введите как будет работать программа? (multiproccess, single, c.futures): ")
     start_time = datetime.now()
     if choice == "multiproccess":
         processes = []
-        q_salary_dynamic = Queue()
-        q_count_dynamic = Queue()
-        q_salary_prof_dynamic = Queue()
-        q_prof_count = Queue()
+        q_salary_dynamic = QueueP()
+        q_count_dynamic = QueueP()
+        q_salary_prof_dynamic = QueueP()
+        q_prof_count = QueueP()
         for w in range(2007, 2022 + 1):
             d = DataSet(f"files/{w}.csv", "Аналитик")
             p = Process(target=d.start_multi, args=(q_salary_dynamic, q_count_dynamic, q_salary_prof_dynamic, q_prof_count))
             processes.append(p)
             p.start()
-
-        for p in processes:
-            p.join()
 
         def iterate(q):
             list = [q.get() for _ in processes]
@@ -432,6 +428,10 @@ if __name__ == '__main__':
             for i in list:
                 d = d | i
             return d
+
+        for p in processes:
+            p.join()
+
         print(f"Динамика уровня зарплат по годам: {dict(sorted(iterate(q_salary_dynamic).items(), key = lambda x:x[0]))}")
         print(f"Динамика количества вакансий по годам: {dict(sorted(iterate(q_count_dynamic).items(), key = lambda x:x[0]))}")
         print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(iterate(q_salary_prof_dynamic).items(), key = lambda x:x[0]))}")
@@ -440,5 +440,26 @@ if __name__ == '__main__':
     elif choice == "single":
         d = DataSet(f"year.csv", "Аналитик")
         d.start()
+    elif choice == "c.futures":
+        salary_dynamic = {}
+        count_dynamic = {}
+        salary_prof_dynamic = {}
+        prof_count = {}
+        futures = []
+        with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
+            for w in range(2007, 2022 + 1):
+                d = DataSet(f"files/{w}.csv", "Аналитик")
+                future = executor.submit(d.start_futures)
+                futures.append(future)
+            for future in futures:
+                r = future.result()
+                salary_dynamic |= r[0]
+                count_dynamic |= r[1]
+                salary_prof_dynamic |= r[2]
+                prof_count |= r[3]
+            print(f"Динамика уровня зарплат по годам: {dict(sorted(salary_dynamic.items(), key=lambda x: x[0]))}")
+            print(f"Динамика количества вакансий по годам: {dict(sorted(count_dynamic.items(), key=lambda x: x[0]))}")
+            print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(salary_prof_dynamic.items(), key=lambda x: x[0]))}")
+            print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(prof_count.items(), key=lambda x: x[0]))}")
 
     print(f"Время: {datetime.now() - start_time}")
