@@ -56,7 +56,7 @@ class DataSet:
         self.prof = prof
 
     def start(self):
-        self.vac, self.header = self.csv_reader()
+        self.vac, self.header = self.csv_reader(self.file_name)
         self.vac = self.csv_filer(self.vac)
         self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
             self.vac, self.header, self.prof)
@@ -76,14 +76,15 @@ class DataSet:
         self.start()
         return self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count
 
-    def csv_reader(self):
+    @staticmethod
+    def csv_reader(file_name):
         """Считывает csv-файл name
 
         Returns:
             data (list): Считанные профессии
             data[0] (list): Заголовки столбцов
         """
-        f = open(self.file_name, encoding='utf-8-sig')
+        f = open(file_name, encoding='utf-8-sig')
         csv_list = csv.reader(f)
         data = [x for x in csv_list]
         return data, data[0]
@@ -438,7 +439,7 @@ if __name__ == '__main__':
         print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(iterate(q_prof_count).items(), key = lambda x:x[0]))}")
 
     elif choice == "single":
-        d = DataSet(f"year.csv", "Аналитик")
+        d = DataSet(f"year_big.csv", "Аналитик")
         d.start()
     elif choice == "c.futures":
         salary_dynamic = {}
