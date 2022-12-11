@@ -42,6 +42,7 @@ for item in new_vac:
 data = {}
 index = []
 
+
 for i in range(old.year, new.year + 1):
     for j in range(1, 12 + 1):
         month = j
@@ -83,4 +84,46 @@ for i in range(old.year, new.year + 1):
             data[f].append(0)
 
 df = pd.DataFrame(data=data, index=index)
+data2 = {
+    "name": [],
+    "salary": [],
+    "area_name": [],
+    "published_at": [],
+}
+
+for item in new_vac:
+    for i in range(len(item)):
+        if header[i] == "name":
+            name = item[i]
+        if header[i] == "salary_from":
+            salary_from = float(item[i])
+        if header[i] == "salary_to":
+            salary_to = float(item[i])
+        if header[i] == "salary_currency":
+            salary_currency = item[i]
+        if header[i] == "area_name":
+            area_name = item[i]
+        if header[i] == "published_at":
+            published_at = item[i]
+    year = published_at.split('-')[0]
+    month = published_at.split('-')[1]
+    date = year + "-" + month
+    salary = (salary_from + salary_to) / 2
+    if salary_currency != "RUR":
+        course = df.loc[date,  salary_currency]
+        if course == 0:
+            continue
+        salary *= course
+    data2["name"].append(name)
+    data2["salary"].append(salary)
+    data2["area_name"].append(area_name)
+    data2["published_at"].append(published_at)
+
+df2 = pd.DataFrame(data=data2)
+
+pd.options.display.max_columns = 10
 print(df)
+print(df2)
+
+with open('csv_data.txt', 'w', encoding="utf-8-sig", newline="") as csv_file:
+    df2.head(100).to_csv(path_or_buf=csv_file, index=False)
