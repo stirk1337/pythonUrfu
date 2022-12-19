@@ -7,41 +7,36 @@ import requests
 filename = "year_big.csv"
 vac, header = DataSet.csv_reader(filename)
 vac = DataSet.csv_filer(vac)
-
+df = pd.DataFrame(data=vac, columns=header)
 currencies = {}
 
-for item in vac:
-    for i in range(len(item)):
-        if header[i] == "salary_currency":
-            if item[i] not in currencies:
-                currencies[item[i]] = 0
-            currencies[item[i]] += 1
+for index, row in df.iterrows():
+    if row['salary_currency'] not in currencies:
+        currencies[row['salary_currency']] = 0
+    currencies[row['salary_currency']] += 1
 
-new_vac = []
-for item in vac:
-    for i in range(len(item)):
-        if header[i] == "salary_currency":
-            if currencies[item[i]] >= 5000:
-                new_vac.append(item)
-
+print('start')
+drops = []
+for index, row in df.iterrows():
+    if not currencies[row['salary_currency']] >= 5000:
+        drops.append(index)
+df.drop(drops, axis=0, inplace=True)
+print('droped')
 old = datetime(2022, 12, 1)
 new = datetime(2000, 1, 1)
 currencies = {k: v for k, v in currencies.items() if v >= 5000}
 
-for item in new_vac:
-    for i in range(len(item)):
-        if header[i] == "published_at":
-            data = item[i].split('-')
-            y, m = int(data[0]), int(data[1])
-            date = datetime(y, m, 1)
-            if date < old:
-                old = date
-            if date > new:
-                new = date
+for index, row in df.iterrows():
+    data = row['published_at'].split('-')
+    y, m = int(data[0]), int(data[1])
+    date = datetime(y, m, 1)
+    if date < old:
+        old = date
+    if date > new:
+        new = date
 
 data = {}
 index = []
-
 
 for i in range(old.year, new.year + 1):
     for j in range(1, 12 + 1):
@@ -83,47 +78,24 @@ for i in range(old.year, new.year + 1):
                 data[f] = []
             data[f].append(0)
 
-df = pd.DataFrame(data=data, index=index)
-data2 = {
-    "name": [],
-    "salary": [],
-    "area_name": [],
-    "published_at": [],
-}
-
-for item in new_vac:
-    for i in range(len(item)):
-        if header[i] == "name":
-            name = item[i]
-        if header[i] == "salary_from":
-            salary_from = float(item[i])
-        if header[i] == "salary_to":
-            salary_to = float(item[i])
-        if header[i] == "salary_currency":
-            salary_currency = item[i]
-        if header[i] == "area_name":
-            area_name = item[i]
-        if header[i] == "published_at":
-            published_at = item[i]
-    year = published_at.split('-')[0]
-    month = published_at.split('-')[1]
+cr = pd.DataFrame(data=data, index=index)
+salaries = []
+for index, row in df.iterrows():
+    year = row['published_at'].split('-')[0]
+    month = row['published_at'].split('-')[1]
     date = year + "-" + month
-    salary = (salary_from + salary_to) / 2
-    if salary_currency != "RUR":
-        course = df.loc[date,  salary_currency]
-        if course == 0:
-            continue
+    salary = (float(row['salary_from']) + float(row['salary_to'])) / 2
+    if row['salary_currency'] != "RUR":
+        course = cr.loc[date,  row['salary_currency']]
         salary *= course
-    data2["name"].append(name)
-    data2["salary"].append(salary)
-    data2["area_name"].append(area_name)
-    data2["published_at"].append(published_at)
-
-df2 = pd.DataFrame(data=data2)
+    salaries.append(salary)
+df.pop('salary_from')
+df.pop('salary_currency')
+df.pop('salary_to')
+df['salary'] = salaries
 
 pd.options.display.max_columns = 10
 print(df)
-print(df2)
 
 with open('csv_data.txt', 'w', encoding="utf-8-sig", newline="") as csv_file:
-    df2.head(100).to_csv(path_or_buf=csv_file, index=False)
+    df.head(100).to_csv(path_or_buf=csv_file, index=False)
