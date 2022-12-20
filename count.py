@@ -81,12 +81,7 @@ cr = pd.DataFrame(data=data, index=index)
 
 conn = sqlite3.connect('centrobank')
 c = conn.cursor()
-cr.to_sql('currencies', conn, if_exists='replace')
-c.execute('''  
-SELECT * FROM currencies
-          ''')
-for row in c.fetchall():
-    print(row)
+cr.to_sql('currencies', conn, if_exists='replace', index='valute')
 
 salaries = []
 for index, row in df.iterrows():
@@ -95,7 +90,11 @@ for index, row in df.iterrows():
     date = year + "-" + month
     salary = (float(row['salary_from']) + float(row['salary_to'])) / 2
     if row['salary_currency'] != "RUR":
-        course = cr.loc[date,  row['salary_currency']]
+        c.execute(f"""
+        SELECT {row['salary_currency']} FROM CURRENCIES WHERE valute='{date}'
+        """)
+        course = c.fetchall()
+        course = float(course[0][0])
         salary *= course
     salaries.append(salary)
 df.pop('salary_from')
