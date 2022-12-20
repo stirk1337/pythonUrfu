@@ -24,3 +24,4 @@
 3.5.1 - ![image](https://user-images.githubusercontent.com/63664630/208644016-affa53b0-abad-4bc6-a8d3-7c6432d1ac39.png)
 ![image](https://user-images.githubusercontent.com/63664630/208644031-f70b1da9-c370-4759-9ae1-cfd08e499048.png)
 
+3.5.2 - ![image](https://user-images.githubusercontent.com/63664630/208654127-c86deb45-c857-4731-9634-a63f4514a450.png)
