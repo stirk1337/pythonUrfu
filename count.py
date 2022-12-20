@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import requests
+import sqlite3
 
 filename = "year_big.csv"
 vac, header = DataSet.csv_reader(filename)
@@ -15,13 +16,11 @@ for index, row in df.iterrows():
         currencies[row['salary_currency']] = 0
     currencies[row['salary_currency']] += 1
 
-print('start')
 drops = []
 for index, row in df.iterrows():
     if not currencies[row['salary_currency']] >= 5000:
         drops.append(index)
 df.drop(drops, axis=0, inplace=True)
-print('droped')
 old = datetime(2022, 12, 1)
 new = datetime(2000, 1, 1)
 currencies = {k: v for k, v in currencies.items() if v >= 5000}
@@ -79,6 +78,16 @@ for i in range(old.year, new.year + 1):
             data[f].append(0)
 
 cr = pd.DataFrame(data=data, index=index)
+
+conn = sqlite3.connect('centrobank')
+c = conn.cursor()
+cr.to_sql('currencies', conn, if_exists='replace')
+c.execute('''  
+SELECT * FROM currencies
+          ''')
+for row in c.fetchall():
+    print(row)
+
 salaries = []
 for index, row in df.iterrows():
     year = row['published_at'].split('-')[0]

@@ -11,6 +11,7 @@ import pdfkit
 from multiprocessing import Process
 from multiprocessing import Queue as QueueP
 from queue import Queue
+import pandas as pd
 from datetime import datetime
 import concurrent.futures
 
@@ -378,7 +379,7 @@ class report:
         options = {
             "enable-local-file-access": None
         }
-        rep.generate_image("graph.png")
+        self.generate_image("graph.png")
         env = Environment(loader=FileSystemLoader('.'))
         template = env.get_template("pdf_template.html")
 
@@ -462,5 +463,6 @@ if __name__ == '__main__':
             print(f"Динамика количества вакансий по годам: {dict(sorted(count_dynamic.items(), key=lambda x: x[0]))}")
             print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(salary_prof_dynamic.items(), key=lambda x: x[0]))}")
             print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(prof_count.items(), key=lambda x: x[0]))}")
+
 
     print(f"Время: {datetime.now() - start_time}")
