@@ -14,3 +14,4 @@ vbig.csv
 year.csv
 year_big.csv
 XML_daily.xml
+__pycache__
