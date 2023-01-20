@@ -8,12 +8,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
 import pdfkit
-from multiprocessing import Process
-from multiprocessing import Queue as QueueP
-from queue import Queue
-import pandas as pd
-from datetime import datetime
-import concurrent.futures
 
 
 class DataSet:
@@ -46,7 +40,7 @@ class DataSet:
         "UZS": 0.0055,
     }
 
-    def __init__(self, name, prof):
+    def __init__(self, name, prof, year_need):
         """Иницилиазирует объект DataSet, создаёт нужные словари для дальшейших вычислений
 
         Args:
@@ -54,13 +48,14 @@ class DataSet:
             prof (str): Название профессии
         """
         self.file_name = name
+        self.year_need = year_need
         self.prof = prof
 
     def start(self):
         self.vac, self.header = self.csv_reader(self.file_name)
         self.vac = self.csv_filer(self.vac)
-        self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years = DataSet.count(
-            self.vac, self.header, self.prof)
+        self.dict_naming, self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.city_count, self.prof_count, self.years, self.skills_count_prof = DataSet.count(
+            self.vac, self.header, self.prof, self.year_need)
         self.salary_city = DataSet.calculate_city(self.vac, self.header, self.dict_naming, self.city_count)
         self.salary_dynamic, self.count_dynamic, self.salary_prof_dynamic, self.prof_count, self.salary_city, self.most = DataSet.last_summ(
             self.salary_dynamic, self.salary_prof_dynamic, self.salary_city, self.city_count, self.count_dynamic,
@@ -116,7 +111,7 @@ class DataSet:
         return re.sub(" +", " ", s)
 
     @staticmethod
-    def count(vac, header, prof):
+    def count(vac, header, prof, year_need):
         """Выполняет счёт по вакансиям
 
         """
@@ -129,9 +124,10 @@ class DataSet:
         city_count = {}
         prof_count = {}
         years = {}
-
+        skills_count_prof = {}
         for item in vac:
             year = int(item[dict_naming['published_at']].split('-')[0])
+            #print(year)
             if year not in years:
                 years[year] = year
             for i in range(len(item)):
@@ -144,10 +140,18 @@ class DataSet:
                     salary_dynamic[year].append(int(salary))
                     if year not in salary_prof_dynamic:
                         salary_prof_dynamic[year] = []
-                    if prof in item[0]: salary_prof_dynamic[year].append(int(salary))
+                    if prof in item[0]:
+                        salary_prof_dynamic[year].append(int(salary))
                     if year not in prof_count:
                         prof_count[year] = 0
-                    if prof in item[0]: prof_count[year] += 1
+                    if prof in item[0]:
+                        prof_count[year] += 1
+                        if year == year_need:
+                            skills = item[1].split('\n')
+                            for skill in skills:
+                                if skill not in skills_count_prof:
+                                    skills_count_prof[skill] = 0
+                                skills_count_prof[skill] += 1
                 city = item[dict_naming['area_name']]
                 if city not in city_count:
                     city_count[city] = 0
@@ -155,7 +159,7 @@ class DataSet:
             if year not in count_dynamic:
                 count_dynamic[year] = 0
             count_dynamic[year] += 1
-        return dict_naming, salary_dynamic, count_dynamic, salary_prof_dynamic, city_count, prof_count, years
+        return dict_naming, salary_dynamic, count_dynamic, salary_prof_dynamic, city_count, prof_count, years, skills_count_prof
 
     @staticmethod
     def calculate_city(vac, header, dict_naming, city_count):
@@ -194,6 +198,7 @@ class DataSet:
         most = {k: float('{:.4f}'.format(v / sum(city_count.values()))) for k, v in city_count.items()}
         most = dict(Counter(most).most_common(10))
         most = {k: v for k, v in most.items() if v >= 0.01}
+
         return salary_dynamic, count_dynamic, salary_prof_dynamic, prof_count, salary_city, most
 
     def show(self):
@@ -206,6 +211,9 @@ class DataSet:
         print('Динамика количества вакансий по годам для выбранной профессии:', self.prof_count)
         print('Уровень зарплат по городам (в порядке убывания):', self.salary_city)
         print('Доля вакансий по городам (в порядке убывания):', self.most)
+        skills_show = dict(Counter(self.skills_count_prof).most_common(10))
+        print('Навыки: ', self.year_need ,dict(sorted(skills_show.items(), key=lambda x: x[1], reverse=True)))
+        #print(self.skills_count_prof)
 
     @staticmethod
     def make_chunks(vac, header):
@@ -410,59 +418,10 @@ class report:
 
 
 if __name__ == '__main__':
-    choice = input("Введите как будет работать программа? (multiproccess, single, c.futures): ")
-    start_time = datetime.now()
-    if choice == "multiproccess":
-        processes = []
-        q_salary_dynamic = QueueP()
-        q_count_dynamic = QueueP()
-        q_salary_prof_dynamic = QueueP()
-        q_prof_count = QueueP()
-        for w in range(2007, 2022 + 1):
-            d = DataSet(f"files/{w}.csv", "Аналитик")
-            p = Process(target=d.start_multi, args=(q_salary_dynamic, q_count_dynamic, q_salary_prof_dynamic, q_prof_count))
-            processes.append(p)
-            p.start()
+    d = DataSet(f"year_big.csv", "менеджер проектов", 2022)
+    r = report(d)
+    d.start()
+    d.show()
+    r.generate_image("graph.png")
+    r.generate_pdf("report.pdf")
 
-        def iterate(q):
-            list = [q.get() for _ in processes]
-            d = {}
-            for i in list:
-                d = d | i
-            return d
-
-        for p in processes:
-            p.join()
-
-        print(f"Динамика уровня зарплат по годам: {dict(sorted(iterate(q_salary_dynamic).items(), key = lambda x:x[0]))}")
-        print(f"Динамика количества вакансий по годам: {dict(sorted(iterate(q_count_dynamic).items(), key = lambda x:x[0]))}")
-        print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(iterate(q_salary_prof_dynamic).items(), key = lambda x:x[0]))}")
-        print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(iterate(q_prof_count).items(), key = lambda x:x[0]))}")
-
-    elif choice == "single":
-        d = DataSet(f"year_big.csv", "Аналитик")
-        d.start()
-    elif choice == "c.futures":
-        salary_dynamic = {}
-        count_dynamic = {}
-        salary_prof_dynamic = {}
-        prof_count = {}
-        futures = []
-        with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
-            for w in range(2007, 2022 + 1):
-                d = DataSet(f"files/{w}.csv", "Аналитик")
-                future = executor.submit(d.start_futures)
-                futures.append(future)
-            for future in futures:
-                r = future.result()
-                salary_dynamic |= r[0]
-                count_dynamic |= r[1]
-                salary_prof_dynamic |= r[2]
-                prof_count |= r[3]
-            print(f"Динамика уровня зарплат по годам: {dict(sorted(salary_dynamic.items(), key=lambda x: x[0]))}")
-            print(f"Динамика количества вакансий по годам: {dict(sorted(count_dynamic.items(), key=lambda x: x[0]))}")
-            print(f"Динамика уровня зарплат по годам для выбранной профессии: {dict(sorted(salary_prof_dynamic.items(), key=lambda x: x[0]))}")
-            print(f"Динамика количества вакансий по годам для выбранной профессии: {dict(sorted(prof_count.items(), key=lambda x: x[0]))}")
-
-
-    print(f"Время: {datetime.now() - start_time}")
